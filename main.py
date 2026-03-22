@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-import google.generativeai as genai
+from groq import Groq
 import os
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,12 +16,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-api_key = os.getenv("GEMINI_API_KEY")
+api_key = os.getenv("GROQ_API_KEY")
 if not api_key:
-    raise ValueError("GEMINI_API_KEY not found in .env file")
+    raise ValueError("GROQ_API_KEY not found in .env file")
 
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel("gemini-3.1-flash-lite")
+client = Groq(api_key=api_key)
 
 class PromptRequest(BaseModel):
     prompt: str
@@ -33,7 +32,16 @@ def home():
 @app.post("/generate")
 def generate(req: PromptRequest):
     try:
-        response = model.generate_content(req.prompt)
-        return {"answer": response.text or "Empty response"}
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "user", "content": req.prompt}
+            ],
+            temperature=0.5,
+            max_tokens=512,
+        )
+
+        return {"answer": response.choices[0].message.content or "Empty response"}
+
     except Exception as e:
         return {"error": str(e)}
